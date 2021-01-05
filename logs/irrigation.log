@@ -1,0 +1,10 @@
+12/02/2020 09:16:38 PM DEBUG Starting new HTTPS connection (1): relieved-asp-16.hasura.app:43
+12/02/2020 09:16:45 PM DEBUG https://relieved-asp-16.hasura.app:443 "POST /v1/graphql HTTP/1.1" 200 None
+12/02/2020 09:16:45 PM INFO syncing...
+12/02/2020 09:16:45 PM INFO Irrigating
+12/02/2020 09:16:45 PM INFO  Irrigating: Hall for 60s
+12/02/2020 09:17:45 PM INFO  Irrigating: Tomato:Raddish:Tulsi for 30s
+12/02/2020 09:18:15 PM INFO  Irrigating: Pepper for 30s
+12/02/2020 09:18:45 PM INFO  Irrigating: Ajma:Dragon_F for 15s
+12/02/2020 09:19:00 PM DEBUG Starting new HTTPS connection (1): relieved-asp-16.hasura.app:443
+12/02/2020 09:19:07 PM DEBUG https://relieved-asp-16.hasura.app:443 "POST /v1/graphql HTTP/1.1" 200 None

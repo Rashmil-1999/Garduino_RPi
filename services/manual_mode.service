@@ -1,0 +1,13 @@
+[Unit]
+Description=Irrigation_mode_subscription Service
+After=multi-user.target
+
+[Service]
+WorkingDirectory=/home/pi/Desktop/proj
+User=pi
+Type=simple
+ExecStart=python3 /home/pi/Desktop/proj/subscriptions/manual_irrigation_subscription.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
