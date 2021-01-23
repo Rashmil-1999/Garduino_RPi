@@ -39,7 +39,7 @@ params = {
   "u_uuid": "0538f99b-b6b3-4c78-8b37-da93249fd4f0"
 }
 
-path = '/home/pi/Desktop/proj/logs'
+path = os.getcwd()
 
 try:
     while not_connected():
@@ -47,7 +47,7 @@ try:
     for result in client.subscribe(subscription,variable_values=params):
         print(json.dumps(result, indent=4, sort_keys=True))
         if result.get("irrigation_timings") is not None:
-            with open(os.path.join(path, "irrigation_time.json"), "w") as f:
+            with open(os.path.join(path, "logs/irrigation_time.json"), "w") as f:
                 json.dump(result,f)
 except KeyboardInterrupt:
     quit()

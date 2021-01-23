@@ -8,6 +8,9 @@ User=pi
 Type=simple
 ExecStart=python3 /home/pi/Desktop/proj/subscriptions/manual_irrigation_subscription.py
 Restart=always
+RestartSec=90
+StartLimitInterval=400
+StartLimitBurst=3
 
 [Install]
 WantedBy=multi-user.target

@@ -4,11 +4,17 @@ import json
 import socket
 import os
 
-MANUAL_SUBSCRIPTION = """
+MANUAL_CONTROL_SUBSCRIPTION = """
     subscription irrigation_mode($u_uuid: uuid!) {
         irrigation_mode(where: {u_uuid: {_eq: $u_uuid}}) {
-            manual
-            u_uuid
+            ch_1
+            ch_2
+            ch_3
+            ch_4
+            ch_5
+            ch_6
+            ch_7
+            ch_8
         }
     }
 """
@@ -25,20 +31,20 @@ transport = WebsocketsTransport(
 # Create a GraphQL client using the defined transport
 client = Client(transport=transport, fetch_schema_from_transport=True)
 
-subscription = gql(MANUAL_SUBSCRIPTION)
+subscription = gql(MANUAL_CONTROL_SUBSCRIPTION)
 
 params = {"u_uuid": "0538f99b-b6b3-4c78-8b37-da93249fd4f0"}
-
-BASE_DIR = "/home/pi/Desktop/proj/logs"
-IRRIGATION_MODE = os.path.join(BASE_DIR, "logs/irrigation_mode.json")
+# BASE_DIR = "/home/pi/Desktop/proj/logs"
+BASE_DIR = os.getcwd()
+IRRIGATION_CONTROL_MODE = os.path.join(BASE_DIR, "logs/manual_control.json")
 try:
     for result in client.subscribe(subscription, variable_values=params):
         print(json.dumps(result, indent=4, sort_keys=True))
         if result.get("irrigation_mode") is not None:
-            with open(IRRIGATION_MODE, "w") as f:
+            with open(IRRIGATION_CONTROL_MODE, "w") as f:
                 json.dump(result, f)
 except KeyboardInterrupt:
     quit()
-except:
-    print("Network Error")
+except Exception as e:
+    print(e)
     quit()

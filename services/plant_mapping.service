@@ -1,12 +1,12 @@
 [Unit]
-Description=Irrigation_subscription Service
+Description=Plant Mapping Service
 After=multi-user.target
 
 [Service]
 WorkingDirectory=/home/pi/Desktop/proj/subscriptions
 User=pi
 Type=simple
-ExecStart=python3 /home/pi/Desktop/proj/subscriptions/irrigation_subscription.py
+ExecStart=python3 /home/pi/Desktop/proj/subscriptions/plant_mapping_subscription.py
 Restart=always
 RestartSec=90
 StartLimitInterval=400

@@ -1,0 +1,1 @@
+{"plant_sensor_mapping": [{"p_uuid": "20e20153-ca27-42e2-a6fb-b94b5f47bd4c", "sensor_mapping": {"alias": "ch_2", "pin_num": 16, "temp_sensor": "28-030c97944774"}}, {"p_uuid": "174c6349-66d3-4b2a-928b-6ee11ace53bd", "sensor_mapping": {"alias": "ch_1", "pin_num": null, "temp_sensor": "28-03109779633b"}}]}
