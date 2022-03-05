@@ -8,6 +8,7 @@ import logging
 import json
 import socket
 import os
+from pprint import pprint
 
 from hasura import HasuraClient
 
@@ -47,6 +48,7 @@ url = "https://relieved-asp-16.hasura.app/v1/graphql"
 headers = {
     "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwNTM4Zjk5Yi1iNmIzLTRjNzgtOGIzNy1kYTkzMjQ5ZmQ0ZjAiLCJpYXQiOjE2MDQ5MTQ3OTEuOTUyLCJlbWFpbCI6InJhc2htaWxwODMzQGdtYWlsLmNvbSIsInJvbGVzIjpbInVzZXIiXSwiaHR0cHM6Ly9oYXN1cmEuaW8vand0L2NsYWltcyI6eyJ4LWhhc3VyYS1hbGxvd2VkLXJvbGVzIjpbInVzZXIiXSwieC1oYXN1cmEtZGVmYXVsdC1yb2xlIjoidXNlciIsIngtaGFzdXJhLXVzZXItaWQiOiIwNTM4Zjk5Yi1iNmIzLTRjNzgtOGIzNy1kYTkzMjQ5ZmQ0ZjAiLCJ4LWhhc3VyYS1vcmctaWQiOiJnYXJkdWlubyIsIngtaGFzdXJhLWFkbWluLXNlY3JldCI6ImFkbWluLXNlY3JldCJ9LCJleHAiOjE2MzY0NTA3OTF9.2HJ14CJ1ShUsU7YqqsD3smRKbx2FJjF_xI6vG1-ZKBc"
 }
+
 
 # flags
 manual_mode = False
@@ -93,7 +95,7 @@ manual_control_data = {}
 # defining time intervals and schedule
 time_interval_list = [50, 30, 25, 15]
 water_schedule = ["08", "13", "18"]
-sensor_update_timings = ["15", "45"]
+sensor_update_timings = ["00", "03", "06", "09", "12", "15", "18", "21"]
 
 # try creating remote handler
 try:
@@ -145,17 +147,56 @@ def read_soil_moisture():
     return soil_moisture
 
 
+def read_avg_soilMoisture(times, testing=False, fetch_max=False, fetch_avg=True, ts=1):
+    keys = ["ch_1", "ch_2", "ch_3", "ch_4", "ch_5", "ch_6", "ch_7", "ch_8"]
+    soil_moisture = {key: [] for key in keys}
+    command = b"moisture\n"
+    for _ in range(times):
+        if testing:
+            command = b"testing\n"
+        ser.write(command)
+        time.sleep(ts)
+        try:
+            read_serial = ser.readlines()[-1].decode("UTF-8")[:-2].split(":")
+        except IndexError:
+            time.sleep(1)
+            continue
+        for i in range(0, len(read_serial), 2):
+            if testing:
+                soil_moisture[read_serial[i]].append(int(int(read_serial[i + 1])))
+            else:
+                soil_moisture[read_serial[i]].append(
+                    100 if int(read_serial[i + 1]) >= 100 else int(read_serial[i + 1])
+                )
+    soil_moisture_copy = {}
+
+    for key, val in soil_moisture.items():
+        if len(val) != 0:
+            if fetch_avg:
+                soil_moisture_copy[key] = sum(val) / len(val)
+            elif fetch_max:
+                soil_moisture_copy[key] = max(val)
+            else:
+                soil_moisture_copy[key] = min(val)
+
+    return soil_moisture_copy
+
+
 def collect_data(DHT_sensor, DHT_pin, soil_temp_sensor, sensor_mappings):
     air_humidity, air_temp = read_DHT22(DHT_sensor, DHT_pin)
-    soil_moisture = read_soil_moisture()
+    soil_moisture = read_avg_soilMoisture(
+        10, testing=False, fetch_max=True, fetch_avg=False, ts=0.5
+    )
     data_points = []
 
     for p_id, sensors in sensor_mappings.items():
-        soil_temp = round(soil_temp_sensor.read_1_temp(sensors[0]), 2)
+        soil_temp = soil_temp_sensor.read_1_temp(sensors[0])
         if soil_temp is not None:
+            soil_temp = round(soil_temp, 2)
             data_points.append(
                 dict(
                     {
+                        "timestamp": str(dt.datetime.now()),
                         "soil_temp": soil_temp,
                         "soil_moisture": soil_moisture[sensors[1]],
                         "air_humidity": round(air_humidity, 2),
@@ -183,7 +224,8 @@ def sync_irrigation_timings():
         for key, value in data["irrigation_timings"][0].items()
         if key != "schedule"
     ]
-    print("New timings ", new_timings)
+    print("New timings:")
+    pprint(new_timings)
     return new_timings
 
 
@@ -206,7 +248,7 @@ def sync_schedule_settings():
     global timing_file_last_modified
     modtime = os.stat(IRRIGATION_TIME)[8]
     if (modtime - timing_file_last_modified) > 0:
-        print("Timing file modified, updating schedule")
+        print("Timing file modified, updating schedule...")
         with open(IRRIGATION_TIME) as f:
             try:
                 data = json.load(f)
@@ -214,7 +256,7 @@ def sync_schedule_settings():
                 timing_file_last_modified = modtime
                 sync_schedule_stack()
             except Exception as e:
-                print("Error Syncing timing file")
+                print("Error Syncing timing file.")
                 print(e)
 
 
@@ -225,6 +267,7 @@ def sync_sensor_status():
     global inverse_sensor_mappings
     modtime = os.stat(PLANT_STATUS)[8]
     if (modtime - sensor_mapping_last_modified) > 0:
+        print("Sensor Status changed, Updating...")
         with open(PLANT_STATUS) as f:
             try:
                 data = json.load(f)
@@ -244,8 +287,11 @@ def sync_sensor_status():
                     for value in data["plant_sensor_mapping"]
                 }
                 sensor_mapping_last_modified = modtime
-                print(sensor_mappings)
-                print(inverse_sensor_mappings)
+                print("Sensor Mappings:")
+                pprint(sensor_mappings)
+                print("\nInverse Sensor Mappings:")
+                pprint(inverse_sensor_mappings)
+                print()
             except Exception as e:
                 print(e)
 
@@ -256,7 +302,7 @@ def sync_manual_settings():
     global manual_file_last_modified
     modtime = os.stat(IRRIGATION_MODE)[8]
     if (modtime - manual_file_last_modified) > 0:
-        print("Manual file config modified, updating parameter")
+        print("\nManual file config modified, updating parameter")
         with open(IRRIGATION_MODE) as f:
             try:
                 data = json.load(f)
@@ -273,12 +319,14 @@ def sync_manual_control_settings():
     global manual_control_file_last_modified
     modtime = os.stat(MANUAL_CONTROL)[8]
     if (modtime - manual_control_file_last_modified) > 0:
+        print("Manual Control modified, executing...\n")
         with open(MANUAL_CONTROL) as f:
             try:
                 data = json.load(f)
                 manual_control_data = data["irrigation_mode"][0]
                 manual_control_file_last_modified = modtime
-                print(manual_control_data)
+                pprint(manual_control_data)
+                print()
             except Exception as e:
                 print(e)
 
@@ -294,6 +342,7 @@ def reset_manual_ctrl_settings():
             f.truncate()
             json.dump({"irrigation_mode": [manual_control_data]}, f)
             manual_control_file_last_modified = os.stat(MANUAL_CONTROL)[8]
+            print("Manual Control file reset complete...")
         except Exception as e:
             print("Error in resetting the file")
             print(e)
@@ -328,7 +377,7 @@ def irrigate():
         GPIO.output(pin, GPIO.LOW)
         # print("Irrigating: " + pin_map[pin] + " for " + str(t) + "s")
         logging.info(" Irrigating: " + pin_map[pin] + " for " + str(t) + "s")
-        print(" Irrigating: " + pin_map[pin] + " for " + str(t) + "s")
+        print(" Irrigating: " + pin_map[pin] + " for " + str(t) + " seconds")
         time.sleep(t)
         GPIO.output(pin, GPIO.HIGH)
 
@@ -344,14 +393,16 @@ def update_sensor_values():
     global remote
     global last_updated_sensor_data
 
+    print(
+        (dt.datetime.now().strftime("%H") in sensor_update_timings)
+        and (last_updated_sensor_data != dt.datetime.now().strftime("%D %H"))
+    )
     # update the sensor values only when the min values are 15 or 45
-    if (dt.datetime.now().strftime("%M") in sensor_update_timings) and (
-        last_updated_sensor_data != dt.datetime.now().strftime("%D %H:%M")
+    if (dt.datetime.now().strftime("%H") in sensor_update_timings) and (
+        last_updated_sensor_data != dt.datetime.now().strftime("%D %H")
     ):
         # sync sensor status
         sync_sensor_status()
-        print("Sensor Status with plant id: ", sensor_mappings)
-
         ### collect sensor data
         collected_data = collect_data(
             DHT_sensor=DHT_sensor,
@@ -359,21 +410,23 @@ def update_sensor_values():
             soil_temp_sensor=soil_temp_sensor,
             sensor_mappings=sensor_mappings,
         )
-
+        print("\nCollected Data:\n")
+        pprint(collected_data)
+        print()
         try:
             if remote is None:
                 remote = HasuraClient(url=url, headers=headers, U_UUID=U_UUID)
             remote.insert_sensor_data(collected_data)
-            print("Sensor Data updated")
-
+            print("Sensor Data updated...")
+            logging.info("Sensor Data Updated . . .")
             # update the last updated data in a file
-            last_updated_sensor_data = dt.datetime.now().strftime("%D %H:%M")
+            last_updated_sensor_data = dt.datetime.now().strftime("%D %H")
             with open(LAST_SENSOR_DATA_UPDATED, "w") as f:
                 f.write(last_updated_sensor_data)
-            print("Write to last_sensor_data_updated.txt complete")
+            print("Write to last_sensor_data_updated.txt complete...\n")
 
         except Exception as e:
-            print("There was an error in updating the remote.")
+            print("There was an error in updating the remote...")
             print(e)
             logging.error("Could not update the remote with sensor data")
 
@@ -395,7 +448,7 @@ def water_by_schedule():
     sync_schedule_settings()
 
     if not auto_control_flag:
-        print("Switched to auto Mode")
+        print("\nSwitched to auto Mode...\n")
         time.sleep(2)
         ring_buzzer("auto")
         auto_control_flag = True
@@ -407,12 +460,11 @@ def water_by_schedule():
 
         ### Syncing Phase Start ###
         logging.info("syncing...")
-        print("Syncing irrigation timings...")
+        print("\nSyncing irrigation timings...")
         time_interval_list = sync_irrigation_timings()
         time.sleep(0.5)
 
         sync_sensor_status()
-        print("Sensor Status with plant id: ", sensor_mappings)
         ### Syncing Phase End ###
 
         ### Data Collection Phase Start ###
@@ -428,42 +480,42 @@ def water_by_schedule():
 
         ### Irrigation Phase Start ###
         logging.info("Irrigating")
-        print("Irrigating")
+        print("\nIrrigating...")
 
         # notify the user of the start of irrigation.
         try:
             ring_buzzer("water")
         except Exception as e:
             logging.error("Can't write to serial port /dev/ttyACM0 not connected")
-            print("Can't write to serial port /dev/ttyACM0 not connecte")
+            print("Can't write to serial port /dev/ttyACM0 not connected!")
 
         irrigate()
-        print("Irrigation complete")
+        print("\nIrrigation complete...")
         ### Irrigation Phase End ###
 
         # update the last_irrigated variable to avoid repeated watering on same day at the same hour
         last_irrigated = dt.datetime.now().strftime("%D %H")
         with open(LAST_IRRIGATED, "w") as f:
             f.write(last_irrigated)
-        print("Write to last_irrigated.txt complete")
+        print("Write to last_irrigated.txt complete...")
 
         # update the watering time array
         water_schedule.append(water_schedule.pop(0))
-        print("Update to Schedule Stack complete")
+        print("Update to Schedule Stack complete...")
 
         ### Remote Update Phase Start ###
         try:
             if remote is None:
                 remote = HasuraClient(url=url, headers=headers, U_UUID=U_UUID)
             remote.update_irrigation_log(time=str(dt.datetime.now()), mode="Automatic")
-            print("Update to remote complete")
+            print("Update to remote complete...")
             network_status = True
 
         except Exception as e:
             with open(PENDING_UPDATE, "a") as f:
                 f.write(str(dt.datetime.now()) + "\n")
             logging.error("Connection error, could not update the remote log.")
-            print("Connection error, could not update the remote log")
+            print("Connection error, could not update the remote log...")
             print(e)
             logging.error(repr(e))
             return
@@ -477,7 +529,7 @@ def water_by_schedule():
                     pending = f.readlines()
                     # print("before modification, ",pending)
                     if len(pending) != 0:
-                        print("Pending updates found, updating the remote.")
+                        print("Pending updates found, updating the remote...")
                         pending = [time.replace("\n", "").strip() for time in pending]
                         # print("after modification, ",pending)
                         for _ in range(len(pending)):
@@ -517,7 +569,8 @@ def manual_watering():
     global remote
 
     if not manual_control_flag:
-        print("Switched to manual Mode")
+        time.sleep(2)
+        print("\nSwitched to manual Mode")
         ring_buzzer("manual")
         manual_control_flag = True
 
@@ -529,8 +582,8 @@ def manual_watering():
         to_irrigate = dict(
             filter(lambda elem: elem[1] != 0, manual_control_data.items())
         )
-        print(list(to_irrigate.keys())[0])
-        print(inverse_sensor_mappings)
+        # print(list(to_irrigate.keys())[0])
+        # pprint(inverse_sensor_mappings)
         pin_num = inverse_sensor_mappings[list(to_irrigate.keys())[0]]["pin_num"]
         print("Irrigating the pin requested: ", pin_num)
         try:
@@ -551,11 +604,11 @@ def manual_watering():
             if remote is None:
                 remote = HasuraClient(url=url, headers=headers, U_UUID=U_UUID)
             remote.update_irrigation_log(time=str(dt.datetime.now()), mode="Manual")
-            print("Update to remote complete")
+            print("Update to remote complete...")
 
         except Exception as e:
             logging.error("Connection error, could not update the remote log.")
-            print("Connection error, could not update the remote log")
+            print("Connection error, could not update the remote log...")
             logging.error(repr(e))
             return
         ### Remote Update Phase End ###
@@ -565,20 +618,25 @@ if __name__ == "__main__":
     try:
         # run these commands to enable/start onewire communication
         os.system("modprobe w1-gpio")
-        os.system("modprobe w1-therm")
+        os.system("sudo modprobe w1-therm")
 
         # Initialize all the pins
         setup(pin_list)
-        print("Starting...")
+        print("Starting Irrigation Module with following settings:\n")
+        pprint("U_UUID: " + U_UUID)
+        print()
+        pprint("URL: " + url)
+        print()
 
         # perform initial sync so that latest data can be used to perform irrigation
         # if no internet available then the script will use default settings and perfom automatic irrigation to all valves
         sync_schedule_settings()
-        print("Water Schedule: ", water_schedule)
+        print("Water Schedule:")
+        pprint(water_schedule)
+        print()
 
         # sync the Sensor status from the file
-        sync_sensor_status()
-        print("Sensor Status with plant id: ", sensor_mappings)
+        # sync_sensor_status()
 
         # main loop
         while True:
@@ -586,7 +644,7 @@ if __name__ == "__main__":
             sync_manual_settings()
 
             # keep track of sensor mappings
-            update_sensor_values()
+            # update_sensor_values()
 
             # if the user sets the garden to auto mode then onlu execute this block of code else perform manual watering
             if not manual_mode:

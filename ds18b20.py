@@ -61,6 +61,9 @@ class DS18B20:
             # print(f'Sensor: {n}  C={c:,.3f}  F={f:,.3f}  DateTime: {t}')
             print(f"Sensor: {n}  C={c:,.3f}  DateTime: {t}")
 
+    def print_sensor_address(self):
+        print(self.sensor_name)
+
     def clear_log(self):
         self.log.clear()
 
@@ -76,7 +79,7 @@ class DS18B20:
 # except KeyboardInterrupt:
 #     quit()
 
-# pin0 = 28-03109779633b
-# pin1 = 28-030c97944774
-# pin2 = 28-030397940a2f
-# pin3 = 28-030e979457c9
+# pin0 = 28-03109779633b 28-03109779633b
+# pin1 = 28-030c97944774 28-030c97944774
+# pin2 = 28-030397940a2f 28-030397940a2f
+# pin3 = 28-030e979457c9 28-030e979457c9
